@@ -29,7 +29,8 @@ def get_absolute_path(relative_path):
 
 
 def is_projection_in_camera_view(x, y, camera_position):
-    return camera_position[0] <= x and camera_position[1] <= y
+    return (camera_position[0] <= x and camera_position[0] > 0 and
+            camera_position[1] <= y and camera_position[1] > 0)
 
 
 class AnnotationProperties(bpy.types.PropertyGroup):
