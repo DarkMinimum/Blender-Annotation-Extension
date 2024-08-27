@@ -3,6 +3,7 @@ import os
 import bpy
 import bpy_extras
 import mathutils
+from bpy.app.handlers import persistent
 
 
 def to_camera_space(world_position, camera):
@@ -29,8 +30,22 @@ def get_absolute_path(relative_path):
 
 
 def is_projection_in_camera_view(x, y, camera_position):
-    return (camera_position[0] <= x and camera_position[0] > 0 and
-            camera_position[1] <= y and camera_position[1] > 0)
+    return (x >= camera_position[0] > 0 and
+            y >= camera_position[1] > 0)
+
+
+def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y):
+    projections = []
+    for object_instance in depsgraph.object_instances:
+        obj = object_instance.object
+        if object_instance.is_instance and object_instance.parent.name == object_name:
+            world_position = object_instance.matrix_world.translation
+            world_position = mathutils.Vector((world_position.x, world_position.y, obj.dimensions.z * 0.9))
+            camera_position = to_camera_space(world_position, camera)
+            if is_projection_in_camera_view(size_x, size_y, camera_position):
+                projections.append(camera_position)
+                # print(f"Instance of {obj.name} at world: {world_position} at camera: {camera_position}")
+    return projections
 
 
 class AnnotationProperties(bpy.types.PropertyGroup):
@@ -57,6 +72,13 @@ class AnnotationProperties(bpy.types.PropertyGroup):
         name="Main Object",
         type=bpy.types.Object,
         description="Object with Geometry Nodes setup"
+    )
+
+    crowd_to_render: bpy.props.IntProperty(
+        name="Renders Quantity",
+        description="Number of head that will be annotated",
+        default=0,
+        min=0
     )
 
 
@@ -106,18 +128,8 @@ class RenderOperator(bpy.types.Operator):
             bpy.ops.render.render(write_still=True)
             self.report({'INFO'}, f"Rendered sequence saved to {output_path}img/IMG_{current_frame}.jpg")
 
-            projections = []
+            projections = count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y)
             full_path = os.path.join(annotation_folder, f"GT_{current_frame}.txt")
-            for object_instance in depsgraph.object_instances:
-                obj = object_instance.object
-                if object_instance.is_instance and object_instance.parent.name == object_name:
-                    world_position = object_instance.matrix_world.translation
-                    world_position = mathutils.Vector((world_position.x, world_position.y, obj.dimensions.z * 0.9))
-                    camera_position = to_camera_space(world_position, camera)
-                    if is_projection_in_camera_view(size_x, size_y, camera_position):
-                        projections.append(camera_position)
-                        # print(f"Instance of {obj.name} at world: {world_position} at camera: {camera_position}")
-
             with open(full_path, 'a') as file:
                 file.writelines(str(projections))
 
@@ -126,6 +138,25 @@ class RenderOperator(bpy.types.Operator):
         self.report({'INFO'}, f"Process finished")
         bpy.context.scene.frame_current = starting_frame
         return {'FINISHED'}
+
+    @persistent
+    def decimate_addon_handler(scene):
+        props = scene.custom_properties
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        props.noded_object.evaluated_get(depsgraph)
+
+        render = bpy.context.scene.render
+        scale = render.resolution_percentage / 100
+        size_x = render.resolution_x * scale
+        size_y = render.resolution_y * scale
+
+        for o in scene.objects:
+            if o.type == 'MESH':
+                if "GeometryNodes" in o.modifiers:
+                    count = count_persons_in_frame(scene.camera, depsgraph, props.noded_object.name, size_x, size_y)
+                    props.crowd_to_render = len(count)
+
+    bpy.app.handlers.depsgraph_update_post.append(decimate_addon_handler)
 
 
 class AnnotationPanel(bpy.types.Panel):
@@ -144,22 +175,32 @@ class AnnotationPanel(bpy.types.Panel):
         props = context.scene.custom_properties
         obj = context.object
 
+        # Current camera name
         row = layout.row()
         row.label(text="Current camera object: " + obj.name)
         row.enabled = props.use_annotation
 
+        # Number of people in one frame
+        row = layout.row()
+        row.label(text="Number of people in frame: " + str(props.crowd_to_render))
+        row.enabled = props.use_annotation
+
+        # Object with node setup
         row = layout.row()
         row.prop(props, "noded_object")
         row.enabled = props.use_annotation
 
+        # Export folder
         row = layout.row()
         row.prop(props, "folder_path", text="Export folder path")
         row.enabled = props.use_annotation
 
+        # Quantity of frames to render
         row = layout.row()
         row.prop(props, "renders_quantity")
         row.enabled = props.use_annotation
 
+        # Render button
         row = layout.row()
         row.operator("render.annotation", text="Render Frames With Annotations")
         row.enabled = props.use_annotation
