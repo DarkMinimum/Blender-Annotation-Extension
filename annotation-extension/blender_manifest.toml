@@ -1,0 +1,12 @@
+schema_version = "1.0.0"
+
+id = "Annotation_Helper"
+version = "1.0.0"
+name = "Annotation helper"
+tagline = "Generates annotations to the instances of Geometry Nodes setup"
+maintainer = "Danylo Hrechyshkin"
+type = "add-on"
+tags = ["Render"]
+blender_version_min = "4.2.0"
+# License conforming to https://spdx.org/licenses/ (use "SPDX: prefix)
+license = ["SPDX:GPL-2.0-or-later"]
