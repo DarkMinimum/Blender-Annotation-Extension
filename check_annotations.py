@@ -1,5 +1,5 @@
-import ast
-import csv
+import re
+import os
 
 import cv2
 import numpy as np
@@ -17,15 +17,17 @@ def annotate():
     with open(points_path, 'r') as file:
         file_content = file.read().strip()
         try:
-            parsed_data = ast.literal_eval(file_content)
+            matches = re.findall(r'\((\d+), (\d+)\)', file_content)
+            pairs = [(int(x), int(y)) for x, y in matches]
 
             # Ensure the parsed data is a list of tuples
-            if isinstance(parsed_data, list) and all(isinstance(item, tuple) for item in parsed_data):
-                print("Parsed data:", parsed_data)
+            if isinstance(pairs, list) and all(isinstance(item, tuple) for item in pairs):
+                print("Parsed data:", pairs)
 
             # Iterate over each row in the CSV
-            for row in parsed_data:
-                img_to_draw = cv2.circle(img_to_draw, (int(row[0]), int(row[1])), 2, (0, 0, 255), -1)
+            print('heads to be printed ' + str(len(pairs)))
+            for row in pairs:
+                img_to_draw = cv2.circle(img_to_draw, (int(row[0]), int(row[1])), 2, (0, 255, 0), -1)
         finally:
             print("finally")
 
