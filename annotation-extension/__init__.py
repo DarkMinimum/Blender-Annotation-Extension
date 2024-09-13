@@ -129,6 +129,7 @@ class RenderOperator(bpy.types.Operator):
 
         for i in range(props.renders_quantity):
             current_frame = bpy.context.scene.frame_current
+            depsgraph.update()
             print(current_frame)
 
             if not props.only_annotation:
@@ -141,7 +142,7 @@ class RenderOperator(bpy.types.Operator):
             with open(full_path, 'a') as file:
                 file.writelines(str(projections))
 
-            bpy.context.scene.frame_current = bpy.context.scene.frame_current + 1
+            bpy.context.scene.frame_current += 1
 
         self.report({'INFO'}, f"Process finished")
         bpy.context.scene.frame_current = starting_frame
