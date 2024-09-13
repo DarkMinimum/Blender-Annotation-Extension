@@ -164,7 +164,7 @@ class RenderOperator(bpy.types.Operator):
                     count = count_persons_in_frame(scene.camera, depsgraph, props.noded_object.name, size_x, size_y)
                     props.crowd_to_render = len(count)
 
-    bpy.app.handlers.depsgraph_update_post.append(decimate_addon_handler)
+    bpy.app.handlers.frame_change_post.append(decimate_addon_handler)
 
 
 class AnnotationPanel(bpy.types.Panel):
