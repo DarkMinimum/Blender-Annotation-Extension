@@ -81,6 +81,12 @@ class AnnotationProperties(bpy.types.PropertyGroup):
         min=0
     )
 
+    only_annotation: bpy.props.BoolProperty(
+        name="Only annotation",
+        description="With this renders only annotation and skips cycles rendering",
+        default=False
+    )
+
 
 class RenderOperator(bpy.types.Operator):
     """Render images with annotations"""
@@ -124,9 +130,11 @@ class RenderOperator(bpy.types.Operator):
         for i in range(props.renders_quantity):
             current_frame = bpy.context.scene.frame_current
             print(current_frame)
-            bpy.context.scene.render.filepath = f"{output_path}img/IMG_{current_frame}.jpg"
-            bpy.ops.render.render(write_still=True)
-            self.report({'INFO'}, f"Rendered sequence saved to {output_path}img/IMG_{current_frame}.jpg")
+
+            if not props.only_annotation:
+                bpy.context.scene.render.filepath = f"{output_path}img/IMG_{current_frame}.jpg"
+                bpy.ops.render.render(write_still=True)
+                self.report({'INFO'}, f"Rendered sequence saved to {output_path}img/IMG_{current_frame}.jpg")
 
             projections = count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y)
             full_path = os.path.join(annotation_folder, f"GT_{current_frame}.txt")
@@ -183,6 +191,11 @@ class AnnotationPanel(bpy.types.Panel):
         # Number of people in one frame
         row = layout.row()
         row.label(text="Number of people in frame: " + str(props.crowd_to_render))
+        row.enabled = props.use_annotation
+
+        # Allows to render only annotation
+        row = layout.row()
+        row.prop(props, "only_annotation")
         row.enabled = props.use_annotation
 
         # Object with node setup
