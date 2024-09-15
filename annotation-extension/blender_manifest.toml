@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "Annotation_Helper"
-version = "1.4.0"
+version = "2.0.0-alpha-SNAPSHOT"
 name = "Annotation helper"
 tagline = "Generates annotations to the instances of Geometry Nodes setup"
 maintainer = "Danylo Hrechyshkin"

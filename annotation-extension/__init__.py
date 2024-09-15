@@ -3,10 +3,12 @@ import os
 import bpy
 import bpy_extras
 import mathutils
+import numpy as np
 from bpy.app.handlers import persistent
 
 
 def to_camera_space(world_position, camera):
+    """Translates world position (X;Y;Z) to camera position (X;Y) and returns the depth (Z)"""
     scene = bpy.context.scene
     co_2d = bpy_extras.object_utils.world_to_camera_view(scene, camera, world_position)
     render_scale = scene.render.resolution_percentage / 100
@@ -14,9 +16,11 @@ def to_camera_space(world_position, camera):
         int(scene.render.resolution_x * render_scale),
         int(scene.render.resolution_y * render_scale),
     )
+
     pixel_coords = (
         round(co_2d.x * render_size[0]),
         round(render_size[1] - co_2d.y * render_size[1]),
+        co_2d.z
     )
     return pixel_coords
 
@@ -30,11 +34,13 @@ def get_absolute_path(relative_path):
 
 
 def is_projection_in_camera_view(x, y, camera_position):
+    """Checks if point lies in camera boundaries"""
     return (x >= camera_position[0] > 0 and
             y >= camera_position[1] > 0)
 
 
-def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y):
+def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y, is_render=False, reduce_occluded=False):
+    """Counts array of points in camera view"""
     projections = []
     for object_instance in depsgraph.object_instances:
         obj = object_instance.object
@@ -45,7 +51,33 @@ def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y):
             if is_projection_in_camera_view(size_x, size_y, camera_position):
                 projections.append(camera_position)
                 # print(f"Instance of {obj.name} at world: {world_position} at camera: {camera_position}")
-    return projections
+
+    if is_render and reduce_occluded:
+        pixels = bpy.data.images['Viewer Node'].pixels
+        depth_buffer = np.array(pixels[:])
+        projections = filter_occluded_heads(projections, depth_buffer)
+
+    reduced_projections = [coords[:2] for coords in projections]
+    return reduced_projections
+
+
+def filter_occluded_heads(projections, depth_buffer):
+    visible_heads = []
+
+    depth_buffer = np.array(depth_buffer).reshape((-1, 4))[:, 0]  # Extract the R channel (depth information)
+    width = bpy.context.scene.render.resolution_x
+    height = bpy.context.scene.render.resolution_y
+    depth_buffer = depth_buffer.reshape((height, width))
+
+    for projection in projections:
+        x_pixel, y_pixel, head_depth = int(projection[0]), int(projection[1]), projection[2]
+
+        if 0 <= x_pixel < width and 0 <= y_pixel < height:
+            buffer_depth = depth_buffer[y_pixel, x_pixel]
+            if head_depth < buffer_depth:  # If head is closer than or equal to the depth buffer, it's visible
+                visible_heads.append(projection)
+
+    return visible_heads
 
 
 class AnnotationProperties(bpy.types.PropertyGroup):
@@ -85,6 +117,12 @@ class AnnotationProperties(bpy.types.PropertyGroup):
         name="Only annotation",
         description="With this renders only annotation and skips cycles rendering",
         default=False
+    )
+
+    filter_occluded_points: bpy.props.BoolProperty(
+        name="Filter occluded points",
+        description="Reduce points that are hidden behind meshes",
+        default=True
     )
 
 
@@ -137,7 +175,9 @@ class RenderOperator(bpy.types.Operator):
                 bpy.ops.render.render(write_still=True)
                 self.report({'INFO'}, f"Rendered sequence saved to {output_path}img/IMG_{current_frame}.jpg")
 
-            projections = count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y)
+            projections = count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y,
+                                                 True,
+                                                 props.filter_occluded_points)
             full_path = os.path.join(annotation_folder, f"GT_{current_frame}.txt")
             with open(full_path, 'a') as file:
                 file.writelines(str(projections))
@@ -149,7 +189,7 @@ class RenderOperator(bpy.types.Operator):
         return {'FINISHED'}
 
     @persistent
-    def decimate_addon_handler(scene):
+    def on_frame_changed(scene):
         props = scene.custom_properties
         depsgraph = bpy.context.evaluated_depsgraph_get()
         props.noded_object.evaluated_get(depsgraph)
@@ -165,7 +205,7 @@ class RenderOperator(bpy.types.Operator):
                     count = count_persons_in_frame(scene.camera, depsgraph, props.noded_object.name, size_x, size_y)
                     props.crowd_to_render = len(count)
 
-    bpy.app.handlers.frame_change_post.append(decimate_addon_handler)
+    bpy.app.handlers.frame_change_post.append(on_frame_changed)
 
 
 class AnnotationPanel(bpy.types.Panel):
@@ -197,6 +237,11 @@ class AnnotationPanel(bpy.types.Panel):
         # Allows to render only annotation
         row = layout.row()
         row.prop(props, "only_annotation")
+        row.enabled = props.use_annotation
+
+        # Allows to reduce occluded points
+        row = layout.row()
+        row.prop(props, "filter_occluded_points")
         row.enabled = props.use_annotation
 
         # Object with node setup
