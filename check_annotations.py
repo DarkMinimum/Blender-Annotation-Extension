@@ -5,9 +5,10 @@ import cv2
 import numpy as np
 from PIL import Image
 
-img_path = 'tmp/IMG_72.jpg'
-points_path = 'tmp/example.txt'
-output_path = 'tmp/res_IMG_72.jpg'
+N = 80
+img_path = '%s/generated/img/IMG_%d.jpg' % (os.environ['SAMPLE_ROOT'], N)
+points_path = '%s/generated/gt/GT_%d.txt' % (os.environ['SAMPLE_ROOT'], N)
+output_path = 'tmp/res/result_' + str(N) + '_%d.jpg'
 
 
 def annotate():
@@ -31,7 +32,7 @@ def annotate():
         finally:
             print("finally")
 
-    cv2.imwrite((output_path), img_to_draw)
+    cv2.imwrite((output_path % len(pairs)), img_to_draw)
 
 
 if __name__ == '__main__':

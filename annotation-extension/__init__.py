@@ -6,6 +6,9 @@ import mathutils
 import numpy as np
 from bpy.app.handlers import persistent
 
+avg_head_radius = 0.15
+height_coef = 0.935
+
 
 def to_camera_space(world_position, camera):
     """Translates world position (X;Y;Z) to camera position (X;Y) and returns the depth (Z)"""
@@ -46,7 +49,7 @@ def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y, is_re
         obj = object_instance.object
         if object_instance.is_instance and object_instance.parent.name == object_name:
             world_position = object_instance.matrix_world.translation
-            world_position = mathutils.Vector((world_position.x, world_position.y, obj.dimensions.z * 0.9))
+            world_position = mathutils.Vector((world_position.x, world_position.y, obj.dimensions.z * height_coef))
             camera_position = to_camera_space(world_position, camera)
             if is_projection_in_camera_view(size_x, size_y, camera_position):
                 projections.append(camera_position)
@@ -64,18 +67,16 @@ def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y, is_re
 def filter_occluded_heads(projections, depth_buffer):
     visible_heads = []
 
-    depth_buffer = np.array(depth_buffer).reshape((-1, 4))[:, 0]  # Extract the R channel (depth information)
+    depth_buffer = np.array(depth_buffer).reshape((-1, 4))[:, 0]
     width = bpy.context.scene.render.resolution_x
     height = bpy.context.scene.render.resolution_y
     depth_buffer = depth_buffer.reshape((height, width))
 
     for projection in projections:
         x_pixel, y_pixel, head_depth = int(projection[0]), int(projection[1]), projection[2]
-
-        if 0 <= x_pixel < width and 0 <= y_pixel < height:
-            buffer_depth = depth_buffer[y_pixel, x_pixel]
-            if head_depth < buffer_depth:  # If head is closer than or equal to the depth buffer, it's visible
-                visible_heads.append(projection)
+        buffer_depth = depth_buffer[y_pixel, x_pixel]
+        if head_depth - buffer_depth <= avg_head_radius:
+            visible_heads.append(projection)
 
     return visible_heads
 
@@ -111,12 +112,6 @@ class AnnotationProperties(bpy.types.PropertyGroup):
         description="Number of head that will be annotated",
         default=0,
         min=0
-    )
-
-    only_annotation: bpy.props.BoolProperty(
-        name="Only annotation",
-        description="With this renders only annotation and skips cycles rendering",
-        default=False
     )
 
     filter_occluded_points: bpy.props.BoolProperty(
@@ -168,13 +163,9 @@ class RenderOperator(bpy.types.Operator):
         for i in range(props.renders_quantity):
             current_frame = bpy.context.scene.frame_current
             depsgraph.update()
-            print(current_frame)
-
-            if not props.only_annotation:
-                bpy.context.scene.render.filepath = f"{output_path}img/IMG_{current_frame}.jpg"
-                bpy.ops.render.render(write_still=True)
-                self.report({'INFO'}, f"Rendered sequence saved to {output_path}img/IMG_{current_frame}.jpg")
-
+            bpy.context.scene.render.filepath = f"{output_path}img/IMG_{current_frame}.jpg"
+            bpy.ops.render.render(write_still=True)
+            self.report({'INFO'}, f"Rendered sequence saved to {output_path}img/IMG_{current_frame}.jpg")
             projections = count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y,
                                                  True,
                                                  props.filter_occluded_points)
@@ -232,11 +223,6 @@ class AnnotationPanel(bpy.types.Panel):
         # Number of people in one frame
         row = layout.row()
         row.label(text="Number of people in frame: " + str(props.crowd_to_render))
-        row.enabled = props.use_annotation
-
-        # Allows to render only annotation
-        row = layout.row()
-        row.prop(props, "only_annotation")
         row.enabled = props.use_annotation
 
         # Allows to reduce occluded points
