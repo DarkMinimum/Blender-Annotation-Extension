@@ -3,11 +3,12 @@ import os
 import bpy
 import bpy_extras
 import mathutils
-import numpy as np
 from bpy.app.handlers import persistent
 
-avg_head_radius = 0.15
+# helps to scale vertical position of the head point
 height_coef = 0.935
+# helps tolerate error during comperashion of mesh surface and origin point of head
+depth_error = 0.5
 
 
 def to_camera_space(world_position, camera):
@@ -42,7 +43,8 @@ def is_projection_in_camera_view(x, y, camera_position):
             y >= camera_position[1] > 0)
 
 
-def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y, is_render=False, reduce_occluded=False):
+def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y, is_render=False,
+                           reduce_occluded=False, is_debug=False, frame=0):
     """Counts array of points in camera view"""
     projections = []
     for object_instance in depsgraph.object_instances:
@@ -50,33 +52,43 @@ def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y, is_re
         if object_instance.is_instance and object_instance.parent.name == object_name:
             world_position = object_instance.matrix_world.translation
             world_position = mathutils.Vector((world_position.x, world_position.y, obj.dimensions.z * height_coef))
-            camera_position = to_camera_space(world_position, camera)
-            if is_projection_in_camera_view(size_x, size_y, camera_position):
-                projections.append(camera_position)
-                # print(f"Instance of {obj.name} at world: {world_position} at camera: {camera_position}")
+            object_in_camera_position = to_camera_space(world_position, camera)
+            if is_projection_in_camera_view(size_x, size_y, object_in_camera_position):
+                projections.append(object_in_camera_position)
+                # print(f"Instance of {obj.name} at world: {world_position} at camera: {object_in_camera_position}")
 
     if is_render and reduce_occluded:
         pixels = bpy.data.images['Viewer Node'].pixels
-        depth_buffer = np.array(pixels[:])
-        projections = filter_occluded_heads(projections, depth_buffer)
+        filtered_projection = filter_occluded_heads(projections, pixels, is_debug)
+        if is_debug:
+            print(
+                "Frame: %d Initial quantity: %d, reduced to: %d" % (frame, len(projections), len(filtered_projection)))
+        projections = filtered_projection
 
     reduced_projections = [coords[:2] for coords in projections]
     return reduced_projections
 
 
-def filter_occluded_heads(projections, depth_buffer):
+def filter_occluded_heads(projections, pixels, is_debug=False):
     visible_heads = []
-
-    depth_buffer = np.array(depth_buffer).reshape((-1, 4))[:, 0]
     width = bpy.context.scene.render.resolution_x
     height = bpy.context.scene.render.resolution_y
-    depth_buffer = depth_buffer.reshape((height, width))
 
     for projection in projections:
         x_pixel, y_pixel, head_depth = int(projection[0]), int(projection[1]), projection[2]
-        buffer_depth = depth_buffer[y_pixel, x_pixel]
-        if head_depth - buffer_depth <= avg_head_radius:
-            visible_heads.append(projection)
+        if 0 <= x_pixel < width and 0 <= y_pixel < height:
+
+            flipped_y = height - y_pixel
+            pixel_index = (flipped_y * width + x_pixel) * 4
+            buffer_depth = pixels[pixel_index]
+            if is_debug:
+                print("(%d:%d)\t" % (x_pixel, y_pixel) +
+                      "{:.5f}".format(head_depth) + " < " +
+                      "{:.5f}".format(buffer_depth) + " : " +
+                      "{:.5f}".format(head_depth - buffer_depth))
+
+            if head_depth - buffer_depth < depth_error:
+                visible_heads.append(projection)
 
     return visible_heads
 
@@ -118,6 +130,12 @@ class AnnotationProperties(bpy.types.PropertyGroup):
         name="Filter occluded points",
         description="Reduce points that are hidden behind meshes",
         default=True
+    )
+
+    log_debug: bpy.props.BoolProperty(
+        name="Console logging",
+        description="Shows stats of reduced points and generating process",
+        default=False
     )
 
 
@@ -167,8 +185,7 @@ class RenderOperator(bpy.types.Operator):
             bpy.ops.render.render(write_still=True)
             self.report({'INFO'}, f"Rendered sequence saved to {output_path}img/IMG_{current_frame}.jpg")
             projections = count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y,
-                                                 True,
-                                                 props.filter_occluded_points)
+                                                 True, props.filter_occluded_points, props.log_debug, i)
             full_path = os.path.join(annotation_folder, f"GT_{current_frame}.txt")
             with open(full_path, 'a') as file:
                 file.writelines(str(projections))
@@ -197,6 +214,7 @@ class RenderOperator(bpy.types.Operator):
                     props.crowd_to_render = len(count)
 
     bpy.app.handlers.frame_change_post.append(on_frame_changed)
+    bpy.app.handlers.depsgraph_update_post.append(on_frame_changed)
 
 
 class AnnotationPanel(bpy.types.Panel):
@@ -229,6 +247,11 @@ class AnnotationPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(props, "filter_occluded_points")
         row.enabled = props.use_annotation
+
+        # Allows to draw additional logs to Console
+        row = layout.row()
+        row.prop(props, "log_debug")
+        row.enabled = props.use_annotation and props.filter_occluded_points
 
         # Object with node setup
         row = layout.row()
