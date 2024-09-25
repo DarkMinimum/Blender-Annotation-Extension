@@ -5,6 +5,9 @@ import bpy_extras
 import mathutils
 from bpy.app.handlers import persistent
 
+from .context_properties import ContextProperties
+from .ui_camera_panel import UiPanel
+
 # helps to scale vertical position of the head point
 height_coef = 0.935
 # helps tolerate error during comperashion of mesh surface and origin point of head
@@ -101,52 +104,6 @@ def filter_occluded_heads(projections, pixels, is_debug=False):
     return visible_heads
 
 
-class AnnotationProperties(bpy.types.PropertyGroup):
-    use_annotation: bpy.props.BoolProperty(
-        name="Enable Annotation",
-        description="This menu enables to create image annotations",
-        default=False
-    )
-
-    folder_path: bpy.props.StringProperty(
-        name="Folder Path",
-        description="Path to a folder with renders and annotations",
-        subtype='DIR_PATH'
-    )
-
-    renders_quantity: bpy.props.IntProperty(
-        name="Renders Quantity",
-        description="Number of renders that would be generated",
-        default=1,
-        min=1
-    )
-
-    noded_object: bpy.props.PointerProperty(
-        name="Main Object",
-        type=bpy.types.Object,
-        description="Object with Geometry Nodes setup"
-    )
-
-    crowd_to_render: bpy.props.IntProperty(
-        name="Renders Quantity",
-        description="Number of head that will be annotated",
-        default=0,
-        min=0
-    )
-
-    filter_occluded_points: bpy.props.BoolProperty(
-        name="Filter occluded points",
-        description="Reduce points that are hidden behind meshes",
-        default=True
-    )
-
-    log_debug: bpy.props.BoolProperty(
-        name="Console logging",
-        description="Shows stats of reduced points and generating process",
-        default=False
-    )
-
-
 class RenderOperator(bpy.types.Operator):
     """Render images with annotations"""
     bl_idname = "render.annotation"
@@ -225,75 +182,18 @@ class RenderOperator(bpy.types.Operator):
     bpy.app.handlers.depsgraph_update_post.append(on_frame_changed)
 
 
-class AnnotationPanel(bpy.types.Panel):
-    """Creates a Panel in the Object properties window"""
-    bl_label = "Annotation"
-    bl_idname = "OBJECT_PT_Annotation"
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = "data"
-
-    def draw_header(self, context):
-        self.layout.prop(context.scene.custom_properties, "use_annotation", text="")
-
-    def draw(self, context):
-        layout = self.layout
-        props = context.scene.custom_properties
-        obj = context.object
-
-        # Current camera name
-        row = layout.row()
-        row.label(text="Current camera object: " + obj.name)
-        row.enabled = props.use_annotation
-
-        # Number of people in one frame
-        row = layout.row()
-        row.label(text="Number of people in frame: " + str(props.crowd_to_render))
-        row.enabled = props.use_annotation
-
-        # Allows to reduce occluded points
-        row = layout.row()
-        row.prop(props, "filter_occluded_points")
-        row.enabled = props.use_annotation
-
-        # Allows to draw additional logs to Console
-        row = layout.row()
-        row.prop(props, "log_debug")
-        row.enabled = props.use_annotation and props.filter_occluded_points
-
-        # Object with node setup
-        row = layout.row()
-        row.prop(props, "noded_object")
-        row.enabled = props.use_annotation
-
-        # Export folder
-        row = layout.row()
-        row.prop(props, "folder_path", text="Export folder path")
-        row.enabled = props.use_annotation
-
-        # Quantity of frames to render
-        row = layout.row()
-        row.prop(props, "renders_quantity")
-        row.enabled = props.use_annotation
-
-        # Render button
-        row = layout.row()
-        row.operator("render.annotation", text="Render Frames With Annotations")
-        row.enabled = props.use_annotation
-
-
 def register():
-    bpy.utils.register_class(AnnotationProperties)
-    bpy.types.Scene.custom_properties = bpy.props.PointerProperty(type=AnnotationProperties)
+    bpy.utils.register_class(ContextProperties)
+    bpy.types.Scene.custom_properties = bpy.props.PointerProperty(type=ContextProperties)
     bpy.utils.register_class(RenderOperator)
-    bpy.utils.register_class(AnnotationPanel)
+    bpy.utils.register_class(UiPanel)
 
 
 def unregister():
-    bpy.utils.unregister_class(AnnotationPanel)
+    bpy.utils.unregister_class(UiPanel)
     bpy.utils.unregister_class(RenderOperator)
     del bpy.types.Scene.custom_properties
-    bpy.utils.unregister_class(AnnotationProperties)
+    bpy.utils.unregister_class(ContextProperties)
 
 
 if __name__ == "__main__":
