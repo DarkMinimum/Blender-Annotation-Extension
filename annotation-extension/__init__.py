@@ -43,9 +43,12 @@ def is_projection_in_camera_view(x, y, camera_position):
             y >= camera_position[1] > 0)
 
 
-def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y, is_render=False,
+def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y,
+                           parent=None, is_render=False,
                            reduce_occluded=False, is_debug=False, frame=0):
     """Counts array of points in camera view"""
+    if parent is None:
+        parent = {}
     projections = []
     for object_instance in depsgraph.object_instances:
         obj = object_instance.object
@@ -55,15 +58,20 @@ def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y, is_re
             object_in_camera_position = to_camera_space(world_position, camera)
             if is_projection_in_camera_view(size_x, size_y, object_in_camera_position):
                 projections.append(object_in_camera_position)
-                # print(f"Instance of {obj.name} at world: {world_position} at camera: {object_in_camera_position}")
+                if is_debug:
+                    print(f"Instance of {obj.name} at world: {world_position} at camera: {object_in_camera_position}")
 
     if is_render and reduce_occluded:
-        pixels = bpy.data.images['Viewer Node'].pixels
-        filtered_projection = filter_occluded_heads(projections, pixels, is_debug)
-        if is_debug:
-            print(
-                "Frame: %d Initial quantity: %d, reduced to: %d" % (frame, len(projections), len(filtered_projection)))
-        projections = filtered_projection
+        if bpy.context.scene.use_nodes:
+            pixels = bpy.data.images['Viewer Node'].pixels
+            filtered_projection = filter_occluded_heads(projections, pixels, is_debug)
+            if is_debug:
+                print(
+                    "Frame: %d Initial quantity: %d, reduced to: %d" % (
+                        frame, len(projections), len(filtered_projection)))
+            projections = filtered_projection
+        else:
+            parent.report({'WARNING'}, "Please set up Viewer Node with Z-Path in order to filter by depth")
 
     reduced_projections = [coords[:2] for coords in projections]
     return reduced_projections
@@ -184,7 +192,7 @@ class RenderOperator(bpy.types.Operator):
             bpy.context.scene.render.filepath = f"{output_path}img/IMG_{current_frame}.jpg"
             bpy.ops.render.render(write_still=True)
             self.report({'INFO'}, f"Rendered sequence saved to {output_path}img/IMG_{current_frame}.jpg")
-            projections = count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y,
+            projections = count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y, self,
                                                  True, props.filter_occluded_points, props.log_debug, i)
             full_path = os.path.join(annotation_folder, f"GT_{current_frame}.txt")
             with open(full_path, 'a') as file:
