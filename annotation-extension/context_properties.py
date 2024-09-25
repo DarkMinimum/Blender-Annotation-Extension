@@ -2,6 +2,9 @@ import bpy
 
 
 class ContextProperties(bpy.types.PropertyGroup):
+    """
+    Context of the extension, allows to share data between UI and RenderOperator
+    """
     use_annotation: bpy.props.BoolProperty(
         name="Enable Annotation",
         description="This menu enables to create image annotations",

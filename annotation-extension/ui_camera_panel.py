@@ -3,6 +3,7 @@ import bpy
 
 class UiPanel(bpy.types.Panel):
     """Creates a Panel in the Object properties window"""
+
     bl_label = "Annotation"
     bl_idname = "OBJECT_PT_Annotation"
     bl_space_type = 'PROPERTIES'
