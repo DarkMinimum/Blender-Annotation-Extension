@@ -43,6 +43,13 @@ class ContextProperties(bpy.types.PropertyGroup):
         default=True
     )
 
+    occlusion_error: bpy.props.FloatProperty(
+        name="Occlusion error",
+        description="Even if head will be further then Z-buffer, but will be less then error then it will be taken",
+        default=0.25,
+        min=0.0
+    )
+
     log_debug: bpy.props.BoolProperty(
         name="Console logging",
         description="Shows stats of reduced points and generating process",

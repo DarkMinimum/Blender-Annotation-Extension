@@ -15,6 +15,8 @@ This release was aimed to refactor depth map part as it was working incorrectly 
 - `ADDED` UI option and functionality for detailed logging. Shows diffs for each point.
 - `CHANGED` Iterating over the depth map as it has anchor point in left-bottom and method calculation returns it left-top format.
 
+3.0.6 `ADDED` Generation of the META of render batch
+3.0.5 `ADDED` Depth Error could be configured with UI
 3.0.4 `CHANGED` Adapted toml file
 3.0.3 `CHANGED` Refactor Render Operator to separate file
 3.0.2 `CHANGED` Refactored to separate files

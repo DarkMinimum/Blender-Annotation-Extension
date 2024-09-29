@@ -1,9 +1,22 @@
 import os
+from datetime import datetime
 
 import bpy
 from bpy.app.handlers import persistent
 
 from .utils import get_absolute_path, count_persons_in_frame
+
+
+def generate_meta(camera, depsgraph, output_path, props, size_x, size_y):
+    meta_folder = get_absolute_path(os.path.join(output_path, "meta"))
+    date = str(datetime.today().strftime('%Y-%m-%d %H:%M:%S'))
+    full_path = os.path.join(meta_folder, f"meta_{date.replace(':', '_')}.txt")
+    with open(full_path, 'a') as file:
+        persons_in_frame = count_persons_in_frame(camera, depsgraph, size_x, size_y, props)
+        file.writelines(date + '\n')
+        file.writelines('Occlusion error: ' + str(props.occlusion_error) + '\n')
+        file.writelines('Quantity of people before filtering: ' + str(len(persons_in_frame)) + '\n')
+        file.writelines('Quantity of frames: ' + str(props.renders_quantity) + '\n')
 
 
 class RenderOperator(bpy.types.Operator):
@@ -23,8 +36,7 @@ class RenderOperator(bpy.types.Operator):
             return {'CANCELLED'}
 
         output_path = props.folder_path
-        object_name = props.noded_object.name
-        obj = bpy.data.objects[object_name]
+        obj = bpy.data.objects[props.noded_object.name]
 
         if not any(mod.type == 'NODES' for mod in obj.modifiers):
             self.report({'WARNING'}, "No Geo nodes found on {object_name}")
@@ -45,13 +57,15 @@ class RenderOperator(bpy.types.Operator):
         size_x = render.resolution_x * scale
         size_y = render.resolution_y * scale
 
+        generate_meta(camera, depsgraph, output_path, props, size_x, size_y)
+
         for i in range(props.renders_quantity):
             current_frame = bpy.context.scene.frame_current
             depsgraph.update()
             bpy.context.scene.render.filepath = f"{output_path}img/IMG_{current_frame}.jpg"
             bpy.ops.render.render(write_still=True)
             self.report({'INFO'}, f"Rendered sequence saved to {output_path}img/IMG_{current_frame}.jpg")
-            projections = count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y, self,
+            projections = count_persons_in_frame(camera, depsgraph, size_x, size_y, props, self,
                                                  True, props.filter_occluded_points, props.log_debug, i)
             full_path = os.path.join(annotation_folder, f"GT_{current_frame}.txt")
             with open(full_path, 'a') as file:
@@ -80,7 +94,7 @@ class RenderOperator(bpy.types.Operator):
         for o in scene.objects:
             if o.type == 'MESH':
                 if "GeometryNodes" in o.modifiers:
-                    count = count_persons_in_frame(scene.camera, depsgraph, props.noded_object.name, size_x, size_y)
+                    count = count_persons_in_frame(scene.camera, depsgraph, size_x, size_y, props)
                     props.crowd_to_render = len(count)
 
     bpy.app.handlers.frame_change_post.append(on_frame_changed)

@@ -33,6 +33,11 @@ class UiPanel(bpy.types.Panel):
         row.prop(props, "filter_occluded_points")
         row.enabled = props.use_annotation
 
+        # Allows to reduce occluded points
+        row = layout.row()
+        row.prop(props, "occlusion_error")
+        row.enabled = props.use_annotation and props.filter_occluded_points
+
         # Allows to draw additional logs to Console
         row = layout.row()
         row.prop(props, "log_debug")

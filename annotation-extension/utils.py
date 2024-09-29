@@ -6,8 +6,7 @@ import mathutils
 
 # helps to scale vertical position of the head point
 height_coef = 0.935
-# helps tolerate error during comperashion of mesh surface and origin point of head
-depth_error = 0.5
+
 
 def to_camera_space(world_position, camera):
     """Translates world position (X;Y;Z) to camera position (X;Y) and returns the depth (Z)"""
@@ -41,7 +40,7 @@ def is_projection_in_camera_view(x, y, camera_position):
             y >= camera_position[1] > 0)
 
 
-def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y,
+def count_persons_in_frame(camera, depsgraph, size_x, size_y, props,
                            parent=None, is_render=False,
                            reduce_occluded=False, is_debug=False, frame=0):
     """Counts array of points in camera view"""
@@ -50,7 +49,7 @@ def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y,
     projections = []
     for object_instance in depsgraph.object_instances:
         obj = object_instance.object
-        if object_instance.is_instance and object_instance.parent.name == object_name:
+        if object_instance.is_instance and object_instance.parent.name == props.noded_object.name:
             world_position = object_instance.matrix_world.translation
             world_position = mathutils.Vector((world_position.x, world_position.y, obj.dimensions.z * height_coef))
             object_in_camera_position = to_camera_space(world_position, camera)
@@ -62,7 +61,7 @@ def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y,
     if is_render and reduce_occluded:
         if bpy.context.scene.use_nodes:
             pixels = bpy.data.images['Viewer Node'].pixels
-            filtered_projection = filter_occluded_heads(projections, pixels, is_debug)
+            filtered_projection = filter_occluded_heads(projections, pixels, props.occlusion_error, is_debug)
             if is_debug:
                 print(
                     "Frame: %d Initial quantity: %d, reduced to: %d" % (
@@ -75,7 +74,7 @@ def count_persons_in_frame(camera, depsgraph, object_name, size_x, size_y,
     return reduced_projections
 
 
-def filter_occluded_heads(projections, pixels, is_debug=False):
+def filter_occluded_heads(projections, pixels, occlusion_error, is_debug=False):
     visible_heads = []
     width = bpy.context.scene.render.resolution_x
     height = bpy.context.scene.render.resolution_y
@@ -93,7 +92,7 @@ def filter_occluded_heads(projections, pixels, is_debug=False):
                       "{:.5f}".format(buffer_depth) + " : " +
                       "{:.5f}".format(head_depth - buffer_depth))
 
-            if head_depth - buffer_depth < depth_error:
+            if head_depth - buffer_depth < occlusion_error:
                 visible_heads.append(projection)
 
     return visible_heads
