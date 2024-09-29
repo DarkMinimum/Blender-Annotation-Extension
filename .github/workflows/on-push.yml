@@ -1,4 +1,4 @@
-name: Annotation Extension Build and Zip
+name: Annotation Extension Build, Zip, and Release
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - master  # Trigger only on pushes to the master branch
 
 jobs:
-  build-and-zip:
+  build-and-release:
     runs-on: ubuntu-latest
 
     steps:
@@ -14,13 +14,7 @@ jobs:
       - name: Checkout master branch
         uses: actions/checkout@v3
 
-      # Step 2: Debug - List the directory contents to check the path
-      - name: List repository files
-        run: |
-          echo "Listing all files in the repository:"
-          ls -R
-
-      # Step 3: Extract version from blender_manifest.toml
+      # Step 2: Extract version from blender_manifest.toml
       - name: Extract version from blender_manifest.toml
         id: extract_version
         run: |
@@ -28,23 +22,44 @@ jobs:
           echo "Version found: $VERSION"
           echo "::set-output name=version::$VERSION"
 
-      # Step 4: Zip the annotation-extension folder
+      # Step 3: Zip the annotation-extension directory
       - name: Zip annotation-extension directory
         run: |
           zip -r annotation-extension.zip annotation-extension
           echo "Zipped annotation-extension folder"
 
-      # Step 5: Rename the zip file using the version
+      # Step 4: Rename the zip file using the version
       - name: Rename zip file with version
         run: |
           VERSION=${{ steps.extract_version.outputs.version }}
           mv annotation-extension.zip annotation-extension-$VERSION.zip
           echo "Renamed zip file to annotation-extension-$VERSION.zip"
 
-      # Step 6: Upload the zip file as an artifact (optional)
-      # GitHub Actions supports storing artifacts for later use
-      - name: Upload Zip as an artifact
-        uses: actions/upload-artifact@v3
+      # Step 5: Create a Git tag for the version
+      - name: Create Git Tag
+        run: |
+          VERSION=${{ steps.extract_version.outputs.version }}
+          git tag -a v$VERSION -m "Release version $VERSION"
+          git push origin v$VERSION
+
+      # Step 6: Create a GitHub Release and attach the zip file
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
         with:
-          name: annotation-extension-${{ steps.extract_version.outputs.version }}.zip
-          path: annotation-extension-${{ steps.extract_version.outputs.version }}.zip
+          tag_name: v${{ steps.extract_version.outputs.version }}
+          release_name: "Release v${{ steps.extract_version.outputs.version }}"
+          body: "Release of annotation-extension version ${{ steps.extract_version.outputs.version }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 7: Upload the zip file to the release
+      - name: Upload Zip to Release
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: annotation-extension-${{ steps.extract_version.outputs.version }}.zip
+          asset_name: annotation-extension-${{ steps.extract_version.outputs.version }}.zip
+          asset_content_type: application/zip

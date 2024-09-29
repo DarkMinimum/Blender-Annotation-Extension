@@ -15,6 +15,7 @@ This release was aimed to refactor depth map part as it was working incorrectly 
 - `ADDED` UI option and functionality for detailed logging. Shows diffs for each point.
 - `CHANGED` Iterating over the depth map as it has anchor point in left-bottom and method calculation returns it left-top format.
 
+3.0.8 `CHANGED` GitHub actions should be stored under release tags
 3.0.7 `ADDED` GitHub actions to publishing artifact
 3.0.6 `ADDED` Generation of the META of render batch
 3.0.5 `ADDED` Depth Error could be configured with UI
