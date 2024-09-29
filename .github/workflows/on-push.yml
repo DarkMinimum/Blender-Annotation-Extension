@@ -1,0 +1,44 @@
+name: Annotation Extension Build and Zip
+
+on:
+  push:
+    branches:
+      - master  # Trigger only on pushes to the master branch
+
+jobs:
+  build-and-zip:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the code from the master branch
+      - name: Checkout master branch
+        uses: actions/checkout@v3
+
+      # Step 2: Read the version from blender-manifest.toml
+      - name: Extract version from blender-manifest.toml
+        id: extract_version
+        run: |
+          VERSION=$(grep -Po '(?<=version = ")[^"]*' ./annotation-extension/blender-manifest.toml)
+          echo "Version found: $VERSION"
+          echo "::set-output name=version::$VERSION"
+
+      # Step 3: Zip the annotation-extension folder
+      - name: Zip annotation-extension directory
+        run: |
+          zip -r annotation-extension.zip annotation-extension
+          echo "Zipped annotation-extension folder"
+
+      # Step 4: Rename the zip file using the version
+      - name: Rename zip file with version
+        run: |
+          VERSION=${{ steps.extract_version.outputs.version }}
+          mv annotation-extension.zip annotation-extension-$VERSION.zip
+          echo "Renamed zip file to annotation-extension-$VERSION.zip"
+
+      # Step 5: Upload the zip file as an artifact (optional)
+      # GitHub Actions supports storing artifacts for later use
+      - name: Upload Zip as an artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: annotation-extension-${{ steps.extract_version.outputs.version }}.zip
+          path: annotation-extension-${{ steps.extract_version.outputs.version }}.zip
