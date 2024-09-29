@@ -14,7 +14,13 @@ jobs:
       - name: Checkout master branch
         uses: actions/checkout@v3
 
-      # Step 2: Read the version from blender-manifest.toml
+      # Step 2: Debug - List the directory contents to check the path
+      - name: List repository files
+        run: |
+          echo "Listing all files in the repository:"
+          ls -R
+
+      # Step 3: Read the version from blender-manifest.toml
       - name: Extract version from blender-manifest.toml
         id: extract_version
         run: |
@@ -22,20 +28,20 @@ jobs:
           echo "Version found: $VERSION"
           echo "::set-output name=version::$VERSION"
 
-      # Step 3: Zip the annotation-extension folder
+      # Step 4: Zip the annotation-extension folder
       - name: Zip annotation-extension directory
         run: |
           zip -r annotation-extension.zip annotation-extension
           echo "Zipped annotation-extension folder"
 
-      # Step 4: Rename the zip file using the version
+      # Step 5: Rename the zip file using the version
       - name: Rename zip file with version
         run: |
           VERSION=${{ steps.extract_version.outputs.version }}
           mv annotation-extension.zip annotation-extension-$VERSION.zip
           echo "Renamed zip file to annotation-extension-$VERSION.zip"
 
-      # Step 5: Upload the zip file as an artifact (optional)
+      # Step 6: Upload the zip file as an artifact (optional)
       # GitHub Actions supports storing artifacts for later use
       - name: Upload Zip as an artifact
         uses: actions/upload-artifact@v3
