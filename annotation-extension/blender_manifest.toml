@@ -1,9 +1,9 @@
 schema_version = "1.0.0"
 
 id = "Annotation_Helper"
-version = "3.0.0"
-name = "Annotation helper"
-tagline = "Generates annotations to the instances of Geometry Nodes setup"
+version = "3.0.7"
+name = "Geometry Annotation Provider"
+tagline = "Renders dense scenes and automatically provides annotation for each element of the scene."
 maintainer = "Danylo Hrechyshkin"
 type = "add-on"
 tags = ["Render"]
