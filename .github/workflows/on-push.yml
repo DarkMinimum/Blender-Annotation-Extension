@@ -20,11 +20,11 @@ jobs:
           echo "Listing all files in the repository:"
           ls -R
 
-      # Step 3: Read the version from blender-manifest.toml
-      - name: Extract version from blender-manifest.toml
+      # Step 3: Extract version from blender_manifest.toml
+      - name: Extract version from blender_manifest.toml
         id: extract_version
         run: |
-          VERSION=$(grep -Po '(?<=version = ")[^"]*' ./Blender-Annotation-Extension/annotation-extension/blender-manifest.toml)
+          VERSION=$(grep -Po '(?<=version = ")[^"]*' ./annotation-extension/blender_manifest.toml)
           echo "Version found: $VERSION"
           echo "::set-output name=version::$VERSION"
 
