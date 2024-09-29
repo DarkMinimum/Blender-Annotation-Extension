@@ -24,7 +24,7 @@ jobs:
       - name: Extract version from blender_manifest.toml
         id: extract_version
         run: |
-          VERSION=$(grep -Po '(?<=version = ")[^"]*' ./annotation-extension/blender_manifest.toml)
+          VERSION=$(grep -Po '(?<=^version = ")[^"]*' ./annotation-extension/blender_manifest.toml)
           echo "Version found: $VERSION"
           echo "::set-output name=version::$VERSION"
 
