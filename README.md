@@ -1,8 +1,8 @@
 
 # Blender annotation extension
 
-This is a source code of the blender annotation extension.
-To use it, archive `annotation-extension` and import it from the local file directly in Blender.
+This is a source code of the blender annotation extension. You could get a ready-to-import zip from releases page.
+To use the source code, archive `annotation-extension` and import it from the local file directly in Blender.
 
 To check generated ground-truth use `check_annotations.py`
 
